@@ -32,7 +32,7 @@ This is a backend web application built with **FastAPI** that provides a RESTful
 2. **Create and activate a virtual environment**
    ```bash
    python -m venv sms_venv
-   venv\Scripts\activate
+   sms_venv\Scripts\activate
    ```
 
 3. **Install dependencies**
