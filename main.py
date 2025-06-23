@@ -9,7 +9,7 @@ import json
 app = FastAPI()
 
 class Subjects(BaseModel):
-    Maths: Annotated[int, Field(..., description="Marks scored in Mathematics")]
+    Mathematics: Annotated[int, Field(..., description="Marks scored in Mathematics")]
     Physics: Annotated[int, Field(..., description="Marks scored in Physics")]
     computer_science: Annotated[int, Field(..., alias="Computer Science", description="Marks scored in Computer Science")]
     English: Annotated[int, Field(..., description="Marks scored in English")]
@@ -28,13 +28,37 @@ class Student(BaseModel):
     @property
     def total_marks(self) -> int:
         s = self.subjects
-        return s.Maths + s.Physics + s.computer_science + s.English + s.Chemistry
+        return s.Mathematics + s.Physics + s.computer_science + s.English + s.Chemistry
         return total_marks_add
 
     @computed_field
     @property
     def average_marks(self) -> float:
         return self.total_marks/5
+
+class SubjectsUpdate(BaseModel):
+    Mathematics: Annotated[Optional[int], Field(default=None, description="Marks scored in Mathematics")]
+    Physics: Annotated[Optional[int], Field(default=None, description="Marks scored in Physics")]
+    computer_science: Annotated[Optional[int], Field(default=None, alias="Computer Science", description="Marks scored in Computer Science")]
+    English: Annotated[Optional[int], Field(default=None, description="Marks scored in English")]
+    Chemistry: Annotated[Optional[int], Field(default=None, description="Marks scored in Chemistry")]
+
+    class Config:
+        populate_by_name = True
+
+class StudentUpdate(BaseModel):
+    name: Annotated[Optional[str], Field(default=None, description="Name of the student")]
+    age: Annotated[Optional[int], Field(default=None, gt=0, lt=25, description="Age of the student")]
+    gender: Annotated[Optional[Literal['Male', 'Female']], Field(default=None, description="Gender of the student")]
+    roll_number: Annotated[Optional[str], Field(default=None, description="Roll number of the student", examples=["CS2025000"])]
+    subjects: Optional[SubjectsUpdate] = None
+    attendance_percentage: Annotated[Optional[float], Field(default=None, description="Attendance Percentage of the student")]
+
+    class Config:
+        populate_by_name = True
+
+
+
 
 
 # Utility Functions
@@ -98,7 +122,43 @@ def create_student(student: Student):
         save_data(data)
         return JSONResponse(status_code=201, content={'message':'New student successfully created'})
 
+@app.delete('/delete/{student_id}')
+def delete_student(student_id):
+    data = load_data()
+    if student_id not in data:
+        raise HTTPException(404, detail="Student ID not found")
+    else:
+        del data[student_id]
+        save_data(data)
+        return JSONResponse(status_code=200, content={'message':'Students data deleted successfully'})
 
+@app.put("/edit/{student_id}")
+def modify_student(student_id: str, student_update: StudentUpdate):
+    data = load_data()
+    if student_id not in data:
+        raise HTTPException(404, detail= "Student ID not found")
+    # else:
+    existing_student_info = data[student_id]
+
+    new_student_info = student_update.model_dump(exclude_unset=True, by_alias=True)
+
+    for key, val in new_student_info.items():
+        if key == "subjects" and val is not None:
+            # Merge subject updates with existing subject data
+            existing_subjects = existing_student_info.get("subjects", {})
+            for sub_key, sub_val in val.items():
+                existing_subjects[sub_key] = sub_val
+            existing_student_info["subjects"] = existing_subjects
+        else:
+            existing_student_info[key] = val
+
+    print(existing_student_info)
+    existing_student_info['id'] = student_id
+    updated_student_info_pydantic = Student(**existing_student_info)
+    existing_student_info = updated_student_info_pydantic.model_dump(exclude = 'id', by_alias=True)
+    data[student_id] = existing_student_info
+    save_data(data)
+    return JSONResponse(status_code=200, content={"message":"Student information updated successfully"})
 
 
 
